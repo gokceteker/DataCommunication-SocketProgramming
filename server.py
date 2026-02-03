@@ -44,23 +44,35 @@ def main():
     print("Server running...")
 
     while True:
-        c, addr = s.accept()
-        packet = c.recv(4096).decode()
-        data, method, control = packet.split("|")
+        try:
+            c, addr = s.accept()
+            packet = c.recv(4096).decode()
+            
+            if not packet:
+                continue
 
-        corrupt = random.choice(errors)
-        corrupted_data = corrupt(data)
+            # split("|", 2) sayesinde paket içinde fazladan | olsa bile hata vermez
+            data, method, control = packet.split("|", 2) 
 
-        new_packet = f"{corrupted_data}|{method}|{control}"
-        print("Forwarded:", new_packet)
+            corrupt = random.choice(errors)
+            corrupted_data = corrupt(data)
 
-        # Forward to Client 2
-        receiver = socket.socket()
-        receiver.connect(("127.0.0.1", 9001))
-        receiver.send(new_packet.encode())
-        receiver.close()
+            new_packet = f"{corrupted_data}|{method}|{control}"
+            print(f"Gelen: {packet} -> Gönderilen: {new_packet}")
 
-        c.close()
+            # Client 2'ye ilet
+            receiver = socket.socket()
+            receiver.settimeout(2) # Bağlantı beklerken takılmaması için
+            receiver.connect(("127.0.0.1", 9001))
+            receiver.send(new_packet.encode())
+            receiver.close()
+
+            c.close()
+            
+        except Exception as e:
+            print(f"Bir paket işlenirken hata oluştu: {e}")
+            # Hata olsa bile döngü devam eder, sunucu kapanmaz
+            if 'c' in locals(): c.close() 
 
 if __name__ == "__main__":
     main()
